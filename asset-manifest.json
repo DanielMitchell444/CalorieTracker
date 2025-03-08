@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/DanielMitchell444/Calorie-Tracker56/static/css/main.7375ac2b.css",
+    "main.js": "/DanielMitchell444/Calorie-Tracker56/static/js/main.b479d9f2.js",
+    "static/media/logo.png": "/DanielMitchell444/Calorie-Tracker56/static/media/logo.f49054cd17740616f94a.png",
+    "static/media/logo.svg": "/DanielMitchell444/Calorie-Tracker56/static/media/logo.6ce24c58023cc2f8fd88fe9d219db6c6.svg",
+    "index.html": "/DanielMitchell444/Calorie-Tracker56/index.html",
+    "main.7375ac2b.css.map": "/DanielMitchell444/Calorie-Tracker56/static/css/main.7375ac2b.css.map",
+    "main.b479d9f2.js.map": "/DanielMitchell444/Calorie-Tracker56/static/js/main.b479d9f2.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.7375ac2b.css",
+    "static/js/main.b479d9f2.js"
+  ]
+}
