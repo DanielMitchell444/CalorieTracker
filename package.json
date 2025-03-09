@@ -1,6 +1,5 @@
 {
   "name": "calorie-tracker",
-  "homepage": "https://github.com/DanielMitchell444/Calorie-Tracker56",
   "predeploy": "npm run build",
   "deploy": "gh-pages -d build",
   "version": "0.1.0",
