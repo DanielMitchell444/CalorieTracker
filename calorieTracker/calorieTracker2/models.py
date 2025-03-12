@@ -62,3 +62,9 @@ class DailyGoals(models.Model):
 class TotalCalories(models.Model):
     email = models.EmailField(unique=False)
     total_calories = models.IntegerField(default=0)
+    date = models.DateField(auto_now_add=True, null=True)
+
+class UserLogoutData(models.Model):
+    total_calories = models.CharField(max_length=4, unique=False, null = True)
+    email = models.CharField(max_length=4, unique=False,  null = True)
+    date = models.DateField(auto_now_add=True, null=True)

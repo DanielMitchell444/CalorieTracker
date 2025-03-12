@@ -228,7 +228,7 @@ class LoginEmailandPassword(APIView):
             user_goals = DailyGoals.objects.filter(email=user.email).first()
 
             # Calculate total calories for today
-            total_calories = CalorieLog.objects.filter(email=email, date=today).distinct().aggregate(Sum('total_calories'))['total_calories__sum'] or 0
+            total_calories = TotalCalories.objects.filter(email=email, date=today).distinct().aggregate(Sum('total_calories'))['total_calories__sum'] or 0
 
             if check_password(password, user.password):
                 # Generate or get the token for this user
@@ -301,49 +301,68 @@ class firebase_token(APIView):
 
 class LoginToken(APIView):
     def create_user_and_token(email, password):
-        user = Users.objects.create_user(email=email, password=password)
-        token = Token.objects.create(user=user)
-        user2 = DailyGoals.objects.filter(user = user).first()
-        user3 = TotalCalories.objects.filter(user = email).first()
+        user = Users.objects.get(email=email)  # Fetch existing user
+        token, created = Token.objects.get_or_create(user=user)  # Get/Create token
 
-        print(calories)
+        # Fetch user goals
+        user_goals = DailyGoals.objects.filter(user=user).first()
+        target_calories = user_goals.target_calories if user_goals else 0
+        target_fat = user_goals.target_fat if user_goals else 0
+        target_protein = user_goals.target_protein if user_goals else 0
+        target_carbs = user_goals.target_carbs if user_goals else 0
 
-        calories = user2.target_calories
-        fat = user2.target_fat
-        protein = user2.target_protein,
-        carbs = user2.target_carbs
-        total_calories = user3.total_calories
-        
-        print(calories)
-        print(fat)
-        print(protein)
-        print(carbs)
-        print(total_calories)
+        # Fetch today's calories
+        today = date.today()
+        user_calories = TotalCalories.objects.filter(email=email, date=today).first()
+        total_calories = user_calories.total_calories if user_calories else 0
+
         return Response({
             "token": token.key,
             "user_id": user.id,
             "email": user.email,
-            "calories": calories,  # Include calories in response
-            "fat": fat,
-            "protein": protein,
-            "carbs": carbs,
-            "total_calories": total_calories
+            "calories": target_calories,  
+            "fat": target_fat,
+            "protein": target_protein,
+            "carbs": target_carbs,
+            "total_calories": user_calories  # Today's total calories
         })
-    
-    
-        
 
 class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        token = request.auth  # This retrieves the token from the request
-        
+        token = request.auth  # Get the token
+        email = request.user.email  # Get user email
+        calories = request.data.get('calories')
+
+        # Ensure calories are provided
+        if calories is None:
+            return Response({'error': 'Calories value is required'}, status=400)
+
+        try:
+            # Clean and convert calories to an integer
+            calories = int(re.sub(r"[^\d]", "", str(calories)))
+
+            # Get today's date
+            today = date.today()
+
+            # Get or create a calorie log entry for today
+            calorie_log, created = CalorieLog.objects.get_or_create(email=email, date=today)
+
+            # Convert stored calories to int and add new calories
+            calorie_log.calories = int(calorie_log.calories) + calories
+            calorie_log.save()
+
+        except ValueError:
+            return Response({'error': 'Invalid calorie format'}, status=400)
+
+        # Log the user out by deleting the token
         if token:
-            token.delete()  # Delete the token to log out the user
-            return Response({'message': 'Logout successful'}, status=200)
-        
+            token.delete()
+            return Response({'message': 'Logout successful, calories saved'}, status=200)
+
         return Response({'message': 'No token found. Already logged out.'}, status=400)
+
 
 
 class RegisterGoals(APIView):
@@ -425,51 +444,69 @@ class RegisterDailyGoals(APIView):
 
 
 
+import re  # Import regex module
+from datetime import date
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from .models import Users, CalorieLog
+
+
 class RegisterFood(APIView):
     def post(self, request):
-        email = request.data.get('email')
-        name = request.data.get('name')
-        calories = request.data.get('calories')
-        fat = request.data.get('fat')
-        grams = request.data.get('grams')
-        carbs = request.data.get('carbs')
-        protein = request.data.get('protein')
+        print("Received Request Data:", request.data)
 
-        # Validate required fields
-        if not all([email, name, calories, fat, grams, carbs, protein]):
+        email = request.data.get('email', '').strip()
+        name = request.data.get('name', '').strip()
+        calories = request.data.get('calories', '').strip()
+        fat = request.data.get('fat', '').strip()
+        grams = request.data.get('grams', '').strip()
+        carbs = request.data.get('carbs', '').strip()
+        protein = request.data.get('protein', '').strip()
+
+        if not email:
+            return Response({"error": "Email is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not all([name, calories, fat, grams, carbs, protein]):
+            print("Validation Failed: Missing required fields")
             return Response({"error": "All fields are required"}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            # Ensure user exists
             user = Users.objects.get(email=email)
         except Users.DoesNotExist:
             return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        # Convert values to proper types
+        def clean_number(value):
+            return re.sub(r"[^\d.]", "", value)
+
         try:
-            calories = int(calories)
-            fat = float(fat)
-            grams = float(grams)
-            carbs = float(carbs)
-            protein = float(protein)
+            calories = int(clean_number(calories))
+            fat = float(clean_number(fat))
+            grams = float(clean_number(grams))
+            carbs = float(clean_number(carbs))
+            protein = float(clean_number(protein))
         except ValueError:
+            print("Validation Failed: Invalid number format")
             return Response({"error": "Invalid number format"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Get today's date
         today = date.today()
 
-        # Update or create a calorie log entry for today
-        calorie_log, created = CalorieLog.objects.update_or_create(
-            user=user, date=today,  # Unique constraint (assuming user and date should be unique)
-            defaults={
-                "name": name,
-                "calories": calories,
-                "fat": fat,
-                "grams": grams,
-                "carbs": carbs,
-                "protein": protein
-            }
-        )
+        # Fetch existing record or create new one
+        calorie_log, created = CalorieLog.objects.get_or_create(email=email, date=today)
+
+        # Convert stored values to correct types before adding
+        calorie_log.calories = int(calorie_log.calories) + calories
+        calorie_log.fat = float(calorie_log.fat) + fat
+        calorie_log.grams = float(calorie_log.grams) + grams
+        calorie_log.carbs = float(calorie_log.carbs) + carbs
+        calorie_log.protein = float(calorie_log.protein) + protein
+        calorie_log.name = name  # Update name if needed
+        calorie_log.save()
+
+        # **Update Total Calories in Separate Table**
+        total_calories_log, _ = TotalCalories.objects.get_or_create(email=email, date=today)
+        total_calories_log.total_calories += calories
+        total_calories_log.save()
 
         return Response({
             "message": "Calorie log updated successfully" if not created else "New calorie log created",
@@ -481,9 +518,9 @@ class RegisterFood(APIView):
                 "carbs": calorie_log.carbs,
                 "protein": calorie_log.protein,
                 "date": calorie_log.date.strftime("%Y-%m-%d")
-            }
+            },
+            "total_calories": total_calories_log.total_calories  # Include updated total
         }, status=status.HTTP_200_OK)
-
 class RegisterTotalCalories(APIView):
 
     def post(self, request):
