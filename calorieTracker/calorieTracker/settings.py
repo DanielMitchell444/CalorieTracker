@@ -93,7 +93,8 @@ DATABASES = {
 CORS_ALLOWED_ORIGINS = [
     "https://www.example.com",
     "https://subdomain.example.com",
-    'http://localhost:3000'
+    'http://localhost:3000',
+    "https://calorie-tracker-gamma-eight.vercel.app/"
 ]
 
 
